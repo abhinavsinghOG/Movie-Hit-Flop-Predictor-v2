@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CineScope | Box-office predictor</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🍿%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#1E1513; --surface:#2A1D1A; --field:#170F0D; --ink:#FBF3E2; --muted:#B9A593; --line:#46322D;
+  --amber:#F5C84C; --hit:#5CC49A; --flop:#F0806F; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 1rem/1.55 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-optical-sizing:auto}
+.wrap{max-width:1120px;margin:0 auto;padding:1.5rem 1.25rem 3.5rem}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.mark{font-weight:800;font-size:1.3rem;letter-spacing:-.02em}
+.meta{color:var(--muted);font-size:.875rem;text-align:right}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.85fr);gap:3.5rem;margin-top:3rem;align-items:start}
+h1{margin:0;font-weight:800;font-size:clamp(2.8rem,7vw,4.75rem);line-height:1;letter-spacing:-.035em}
+.lede{margin:1rem 0 2.25rem;max-width:44ch;color:var(--muted);font-size:1.05rem}
+fieldset{margin:0 0 1.5rem;padding:1rem 0 0;border:0;border-top:1px solid var(--line)}
+legend{padding:0 1rem 0 0;font-weight:700;font-size:1.05rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem 1.25rem;margin-top:.4rem}
+.field{display:flex;flex-direction:column;gap:.35rem;min-width:0}
+.field.full{grid-column:1/-1}
+label,.lab{font-size:.875rem;font-weight:600}
+.lab{display:flex;justify-content:space-between;align-items:baseline}
+output{font-variant-numeric:tabular-nums;font-weight:700;color:var(--amber)}
+.hint{margin:0;color:var(--muted);font-size:.8125rem;min-height:1.2em}
+input[type=number],select{width:100%;padding:.72rem .85rem;font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px}
+input[type=range]{width:100%;accent-color:var(--amber);margin:.25rem 0}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+button.go{width:100%;margin-top:.5rem;padding:1rem;font:700 1.05rem "Bricolage Grotesque",system-ui,sans-serif;color:#1B1404;background:var(--amber);border:0;border-radius:12px;cursor:pointer}
+button.go:hover{filter:brightness(1.08)}
+button.go[disabled]{opacity:.6;cursor:progress}
+details{margin-top:1.5rem;color:var(--muted);font-size:.9rem}
+summary{cursor:pointer;font-weight:600;color:var(--ink)}
+details ul{padding-left:1.1rem;margin:.6rem 0}
+details li{margin:.3rem 0;max-width:60ch}
+.note{margin:1.5rem 0 0;color:var(--muted);font-size:.8125rem}
+
+/* Result panel: floods with the verdict colour */
+aside{position:sticky;top:1.25rem}
+.ticket{border-radius:22px;background:var(--surface);border:1px solid var(--line);overflow:hidden;transition:background .4s ease,color .4s ease}
+.ticket:has(.verdict.hit){background:var(--hit);border-color:transparent;color:#062A1E;--muted:#1E5A45;--line:rgba(6,42,30,.25)}
+.ticket:has(.verdict.flop){background:var(--flop);border-color:transparent;color:#340D08;--muted:#702B22;--line:rgba(52,13,8,.25)}
+.top{padding:1.75rem 1.75rem 1.9rem}
+.perf{border-top:1px solid var(--line)}
+.bottom{padding:1.4rem 1.75rem 1.6rem}
+.status{margin:0 0 .6rem;color:var(--muted);font-size:.95rem}
+.verdict{margin:0;font-weight:800;font-size:clamp(5rem,14vw,9rem);line-height:.85;letter-spacing:-.05em}
+.verdict.idle{color:var(--line)}
+.verdict.hit,.verdict.flop{color:inherit}
+.verdict.show{animation:rise .5s cubic-bezier(.2,.7,.2,1)}
+@keyframes rise{from{transform:translateY(.15em);opacity:0}}
+.gauge{position:relative;height:12px;margin:1.6rem 0 .5rem;border-radius:6px;background:rgba(0,0,0,.2)}
+.gauge i{display:block;height:100%;width:0;border-radius:6px;background:currentColor;transition:width .7s cubic-bezier(.2,.7,.2,1)}
+.gauge::after{content:"";position:absolute;left:50%;top:-5px;width:2px;height:22px;margin-left:-1px;background:currentColor;opacity:.7}
+.scale{display:flex;justify-content:space-between;color:var(--muted);font-size:.8125rem}
+.pct{margin:.9rem 0 .2rem;font-size:1.2rem;font-weight:700}
+.pct span{font-variant-numeric:tabular-nums}
+.conf{margin:0;color:var(--muted)}
+dl{display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1.2rem;margin:0}
+dt{color:var(--muted);font-size:.8125rem}
+dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.empty{margin:0;color:var(--muted);max-width:34ch}
+.alert{margin:1rem 0 0;padding:.75rem .9rem;border:1px solid var(--flop);border-radius:8px;color:var(--flop);font-size:.9rem}
+.preview{margin:0 0 .9rem;padding:.5rem .7rem;border:1px dashed var(--amber);border-radius:8px;font-size:.8125rem;color:var(--ink)}
+
+/* Popcorn-box stripes */
+body::before,body::after{content:"";position:fixed;top:0;bottom:0;width:48px;background:repeating-linear-gradient(90deg,#C8362D 0 12px,#F6EBD0 12px 24px);pointer-events:none}
+body::before{left:0}
+body::after{right:0}
+@media (max-width:1240px){
+  body::after{display:none}
+  body::before{left:0;right:0;bottom:auto;width:auto;height:10px;z-index:5}
+}
+
+@media (max-width:899px){
+  .layout{grid-template-columns:1fr;gap:2.25rem;margin-top:2rem}
+  aside{position:static}
+}
+@media (max-width:520px){
+  .grid{grid-template-columns:1fr}
+  .meta{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .verdict.show{animation:none} .gauge i,.ticket{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="mark">🍿 CineScope</span>
+    <span class="meta">Trained on films released 1980 to 2001</span>
+  </header>
+
+  <div class="layout">
+    <main>
+      <h1>Will it<br>be a hit?</h1>
+      <p class="lede">Enter a film’s details. A hit earns at least 1.5x its budget at the box office.</p>
+
+      <form id="form" novalidate>
+        <fieldset>
+          <legend>Production</legend>
+          <div class="grid">
+            <div class="field full">
+              <div class="lab"><label for="budget">Budget (USD)</label><output id="budgetOut">$50.0M</output></div>
+              <input id="budget" type="number" min="100000" max="500000000" step="1000000" value="50000000" inputmode="numeric">
+            </div>
+            <div class="field">
+              <div class="lab"><label for="runtime">Runtime</label><output id="runtimeOut">110 min</output></div>
+              <input id="runtime" type="range" min="69" max="250" value="110">
+            </div>
+            <div class="field">
+              <div class="lab"><label for="year">Release year</label><output id="yearOut">2024</output></div>
+              <input id="year" type="range" min="1980" max="2030" value="2024">
+              <p class="hint" id="yearHint"></p>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Audience</legend>
+          <div class="grid">
+            <div class="field">
+              <div class="lab"><label for="score">Expected IMDb score</label><output id="scoreOut">6.5</output></div>
+              <input id="score" type="range" min="4" max="10" step="0.1" value="6.5">
+            </div>
+            <div class="field">
+              <div class="lab"><label for="votes">Expected IMDb votes</label></div>
+              <input id="votes" type="number" min="1000" max="3000000" step="5000" value="100000" inputmode="numeric">
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Release and cast</legend>
+          <div class="grid">
+            <div class="field"><label for="month">Release month</label><select id="month"></select></div>
+            <div class="field"><label for="genre">Genre</label><select id="genre"></select></div>
+            <div class="field"><label for="rating">MPAA rating</label><select id="rating"></select></div>
+            <div class="field"><label for="country">Country</label><select id="country"></select></div>
+            <div class="field full"><label for="company">Production company</label><select id="company"></select></div>
+            <div class="field"><label for="director">Director</label><select id="director"></select></div>
+            <div class="field"><label for="star">Lead star</label><select id="star"></select></div>
+          </div>
+        </fieldset>
+
+        <button class="go" id="go" type="submit">Predict box-office outcome</button>
+      </form>
+
+      <details>
+        <summary>How the prediction works</summary>
+        <ul>
+          <li>The model is a tuned Gradient Boosting classifier with a test ROC-AUC of about 0.87 and accuracy of about 78%.</li>
+          <li>It uses budget, runtime, year, expected IMDb score and votes, release month, genre, rating, country, company, director and lead star.</li>
+          <li>The bar shows the estimated chance of a hit. The line at the middle is 50%. A close call means the result sits near that line, so treat it with caution.</li>
+        </ul>
+      </details>
+      <p class="note">Predictions are estimates based on historical data, not guarantees.</p>
+    </main>
+
+    <aside aria-label="Prediction result">
+      <div class="ticket">
+        <div class="top" id="top" aria-live="polite">
+          <p class="status" id="status">No prediction yet</p>
+          <p class="verdict idle" id="verdict">?</p>
+          <p class="empty" id="empty">Fill in the film’s details, then press Predict box-office outcome.</p>
+          <div id="gaugeBox" hidden>
+            <div class="gauge" id="gauge"><i id="fill"></i></div>
+            <div class="scale"><span>Flop</span><span>Hit</span></div>
+            <p class="pct" id="pct"></p>
+            <p class="conf" id="conf"></p>
+          </div>
+          <div class="alert" id="alert" role="alert" hidden></div>
+        </div>
+        <div class="perf"></div>
+        <div class="bottom"><dl id="summary"></dl></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+/* ---- Settings ------------------------------------------------------------
+   API_URL: leave empty when app.py serves this page (same server).
+   If you host this file somewhere else, put the backend address here,
+   for example "https://cinescope-api.onrender.com".
+   Opened straight from your computer with no API_URL, the page runs in
+   preview mode and shows a sample result, not a model prediction.        */
+const API_URL = "";
+const PREVIEW = API_URL === "" && location.protocol === "file:";
+
+/* Fallback lists, used in preview mode or if the server can't be reached. */
+const FALLBACK = {"release_month":["April","August","December","February","January","July","June","March","May","November","October","September","Unknown"],"genre_grp":["Action","Adventure","Animation","Biography","Comedy","Crime","Drama","Fantasy","Horror","Mystery","Other"],"rating_grp":["G","Not Rated","Other","PG","PG-13","R","Unknown","Unrated"],"country_grp":["Australia","Canada","France","Germany","Italy","Japan","Other","United Kingdom","United States"],"company_grp":["Artisan Entertainment","Caravan Pictures","Carolco Pictures","Castle Rock Entertainment","Columbia Pictures","De Laurentiis Entertainment Group (DEG)","Dimension Films","Dino De Laurentiis Company","Dreamworks Pictures","Fox 2000 Pictures","Golan-Globus Productions","Hollywood Pictures","Imagine Entertainment","Jack Rollins & Charles H. Joffe Productions","Metro-Goldwyn-Mayer (MGM)","Miramax","Morgan Creek Entertainment","New Line Cinema","New Regency Productions","Orion Pictures","Other","Paramount Pictures","PolyGram Filmed Entertainment","Polygram Filmed Entertainment","Touchstone Pictures","TriStar Pictures","Twentieth Century Fox","United Artists","Universal Pictures","Walt Disney Pictures","Warner Bros."],"director_grp":["Alan Parker","Barry Levinson","Brian De Palma","Clint Eastwood","Directors","Garry Marshall","Ivan Reitman","Joel Coen","Joel Schumacher","John Carpenter","John Landis","John Sayles","Martin Scorsese","Mike Nichols","Other","Renny Harlin","Richard Benjamin","Richard Donner","Rob Reiner","Robert Altman","Robert Zemeckis","Ron Howard","Sam Raimi","Spike Lee","Steven Soderbergh","Steven Spielberg","Tim Burton","Tony Scott","Walter Hill","Wes Craven","Woody Allen"],"star_grp":["Arnold Schwarzenegger","Bruce Willis","Charlie Sheen","Chevy Chase","Clint Eastwood","Eddie Murphy","Gene Hackman","Harrison Ford","Jack Nicholson","Jean-Claude Van Damme","Jeff Bridges","John Travolta","Johnny Depp","Keanu Reeves","Kevin Costner","Kurt Russell","Mel Gibson","Michael Douglas","Michael J. Fox","Nick Nolte","Nicolas Cage","Other","Richard Gere","Robert De Niro","Robin Williams","Sean Connery","Steve Martin","Sylvester Stallone","Tom Cruise","Tom Hanks","Val Kilmer"],"year_min":1980,"year_max":2001,"score_min":4.0,"score_max":8.8,"runtime_min":69,"runtime_max":147};
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December","Unknown"];
+const $ = id => document.getElementById(id);
+const otherLast = v => v.filter(x => x !== "Other").concat(v.includes("Other") ? ["Other"] : []);
+const money = n => n >= 1e6 ? "$" + (n / 1e6).toFixed(1) + "M" : "$" + Number(n).toLocaleString("en-US");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let OPT = FALLBACK;
+
+function fill(id, values){ $(id).innerHTML = values.map(v => `<option>${esc(v)}</option>`).join(""); }
+
+async function loadOptions(){
+  if (PREVIEW) return FALLBACK;
+  try {
+    const r = await fetch(API_URL + "/api/options");
+    if (!r.ok) throw new Error();
+    return await r.json();
+  } catch { showError("Can’t reach the prediction server. Check that app.py is running, then reload this page."); return FALLBACK; }
+}
+
+function showError(msg){ const a = $("alert"); a.textContent = msg; a.hidden = false; }
+
+function syncOutputs(){
+  $("budgetOut").textContent = money(+$("budget").value || 0);
+  $("runtimeOut").textContent = $("runtime").value + " min";
+  $("yearOut").textContent = $("year").value;
+  $("scoreOut").textContent = (+$("score").value).toFixed(1);
+  const y = +$("year").value;
+  $("yearHint").textContent = (y < OPT.year_min || y > OPT.year_max)
+    ? `The model learned from films released ${OPT.year_min} to ${OPT.year_max}, so this year is outside its range.` : "";
+}
+
+async function init(){
+  OPT = await loadOptions();
+  fill("month", MONTHS.filter(m => OPT.release_month.includes(m)));
+  fill("genre", otherLast(OPT.genre_grp));
+  fill("rating", otherLast(OPT.rating_grp));
+  fill("country", otherLast(OPT.country_grp));
+  fill("company", otherLast(OPT.company_grp));
+  fill("director", otherLast(OPT.director_grp));
+  fill("star", otherLast(OPT.star_grp));
+  $("runtime").min = OPT.runtime_min; $("year").min = OPT.year_min; $("score").min = OPT.score_min;
+  ["budget","runtime","year","score"].forEach(id => $(id).addEventListener("input", syncOutputs));
+  syncOutputs();
+  if (PREVIEW) {
+    const p = document.createElement("p");
+    p.className = "preview";
+    p.textContent = "Preview mode: results are a sample, not from the trained model.";
+    $("top").prepend(p);
+  }
+}
+
+function payload(){
+  return {
+    budget: +$("budget").value, runtime: +$("runtime").value, year: +$("year").value,
+    score: +$("score").value, votes: +$("votes").value,
+    release_month: $("month").value, genre: $("genre").value, rating: $("rating").value,
+    country: $("country").value, company: $("company").value,
+    director: $("director").value, star: $("star").value
+  };
+}
+
+function previewEstimate(p){
+  const z = (p.score - 6.2) * 1.3 - Math.log10(p.budget / 5e7) * 0.9;
+  const prob = 1 / (1 + Math.exp(-z));
+  const gap = Math.abs(prob - .5);
+  return { prediction: prob >= .5 ? "hit" : "flop", probability: prob,
+           confidence: gap >= .3 ? "High confidence" : gap >= .15 ? "Moderate confidence" : "Close call" };
+}
+
+async function predict(p){
+  if (PREVIEW) return previewEstimate(p);
+  const r = await fetch(API_URL + "/api/predict", {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(p)
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || "The server couldn’t make a prediction.");
+  return data;
+}
+
+function render(res, p){
+  const hit = res.prediction === "hit", cls = hit ? "hit" : "flop";
+  const pct = Math.round(res.probability * 100);
+  $("alert").hidden = true;
+  $("status").textContent = hit ? "Expected to earn at least 1.5x its budget." : "Expected to earn less than 1.5x its budget.";
+  const v = $("verdict");
+  v.className = "verdict " + cls; v.textContent = hit ? "HIT" : "FLOP";
+  void v.offsetWidth; v.classList.add("show");
+  $("empty").hidden = true; $("gaugeBox").hidden = false;
+  $("gauge").className = "gauge " + cls;
+  $("fill").style.width = "0";
+  requestAnimationFrame(() => requestAnimationFrame(() => { $("fill").style.width = pct + "%"; }));
+  $("pct").innerHTML = `<span>${pct}%</span> chance of a hit`;
+  $("conf").textContent = res.confidence;
+  const rows = [
+    ["Budget", money(p.budget)], ["Runtime", p.runtime + " min"],
+    ["Release", p.release_month + " " + p.year], ["IMDb score", p.score.toFixed(1)],
+    ["Genre", p.genre], ["Rating", p.rating], ["Country", p.country],
+    ["Company", p.company], ["Director", p.director], ["Lead star", p.star]
+  ];
+  $("summary").innerHTML = rows.map(([k, val]) => `<div><dt>${k}</dt><dd>${esc(val)}</dd></div>`).join("");
+  if (matchMedia("(max-width:899px)").matches)
+    $("top").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth", block: "start"});
+}
+
+$("form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const btn = $("go"), p = payload();
+  btn.disabled = true; btn.textContent = "Predicting…";
+  try { render(await predict(p), p); }
+  catch (err) { showError(err.message || "Something went wrong. Try again."); }
+  finally { btn.disabled = false; btn.textContent = "Predict box-office outcome"; }
+});
+
+init();
+</script>
+</body>
+</html>
